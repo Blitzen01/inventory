@@ -1,170 +1,249 @@
 <?php
-// Include necessary files
+session_start();
+
 include "../src/cdn/cdn_links.php";
 include "../render/connection.php";
-include "../nav/header.php"; // ✅ INCLUDE HEADER FIRST
+include "../nav/header.php";
 
 if (!isset($conn)) {
     die("Error: Database connection not established.");
 }
 
-// --- FETCH INVENTORY LOG DATA ---
+// --- PAGINATION & FILTER LOGIC ---
+$limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$offset = ($page - 1) * $limit;
+$search = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : '';
+
+// Build Search Query
+$search_query = "";
+if ($search) {
+    $search_query = " WHERE p.product_name LIKE '%$search%' OR p.sku LIKE '%$search%' OR il.action_type LIKE '%$search%' ";
+}
+
+// Get total records for pagination
+$total_query = "SELECT COUNT(*) as total FROM inventory_log il LEFT JOIN products p ON il.product_id = p.product_id $search_query";
+$total_results = $conn->query($total_query)->fetch_assoc()['total'];
+$total_pages = ceil($total_results / $limit);
+
+// --- FETCH DATA ---
 $sql_activity_log = "SELECT 
-                        il.log_id, 
-                        il.timestamp, 
-                        il.action_type, 
-                        il.quantity_change, 
-                        il.log_details,
-                        il.remarks,
-                        p.product_name, 
-                        p.sku,
-                        u.first_name, 
-                        u.last_name
+                        il.log_id, il.timestamp, il.action_type, 
+                        il.quantity_change, il.log_details, il.remarks,
+                        p.product_name, p.sku,
+                        u.first_name, u.last_name
                     FROM inventory_log il
-                    LEFT JOIN products p 
-                        ON il.product_id = p.product_id
-                    LEFT JOIN users u 
-                        ON il.user_id = u.user_id
+                    LEFT JOIN products p ON il.product_id = p.product_id
+                    LEFT JOIN users u ON il.user_id = u.user_id
+                    $search_query
                     ORDER BY il.timestamp DESC
-                    LIMIT 100";
+                    LIMIT $limit OFFSET $offset";
 
 $inventoryLogsResult = $conn->query($sql_activity_log);
 
-// Helper function to format "time ago"
 function time_ago($timestamp) {
     $time_difference = time() - strtotime($timestamp);
-    $periods = ["second", "minute", "hour", "day", "week", "month", "year"];
+    $periods = ["sec", "min", "hr", "day", "wk", "mo", "yr"];
     $lengths = [60, 60, 24, 7, 4.35, 12, 1000];
-
     if ($time_difference < 5) return "just now";
-
     for ($i = 0; $time_difference >= $lengths[$i] && $i < count($lengths) - 1; $i++) {
         $time_difference /= $lengths[$i];
     }
-
     $time_difference = round($time_difference);
-    $period = $periods[$i] . ($time_difference != 1 ? "s" : "");
-
-    return "$time_difference $period ago";
+    return "$time_difference " . $periods[$i] . ($time_difference != 1 ? "s" : "") . " ago";
 }
 ?>
 <!doctype html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Inventory Logs</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <head>
+        <meta charset="utf-8">
+        <title>Inventory Logs | Management</title>
+        <style>
+            body { background-color: #f4f7f6; padding-top: 70px; }
+            .card { border: none; border-radius: 10px; }
+            .table thead th { 
+                background-color: #f8f9fa; 
+                text-transform: uppercase; 
+                font-size: 11px; 
+                letter-spacing: 1px; 
+                color: #555;
+                border-top: none;
+            }
+            
+            /* Status Pill / Badge Design */
+            .status-pill { font-size: 10px; font-weight: 700; padding: 4px 10px; letter-spacing: 0.5px; }
+            
+            /* Pagination Logic: Dark Active, Light Inactive */
+            .pagination .page-link { 
+                border: 1px solid #dee2e6;
+                color: #212529; 
+                padding: 5px 12px;
+                font-weight: 500;
+                transition: all 0.2s;
+            }
+            .pagination .page-item.active .page-link { 
+                background-color: #212529 !important; 
+                border-color: #212529 !important; 
+                color: #ffffff !important; 
+            }
+            .pagination .page-link:hover { background-color: #e9ecef; color: #000; }
+            
+            .text-italic { font-style: italic; opacity: 0.8; }
+        </style>
+    </head>
+<body>
 
-    <style>
-        body { padding-top: 56px; }
-        .table-row-add { background-color: #d1e7dd; }
-        .table-row-remove { background-color: #f8d7da; }
-        .table-row-update { background-color: #fff3cd; }
-    </style>
-</head>
-
-<body class="bg-light">
-
-<div class="container-fluid mt-4">
-
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="fw-light text-dark">
-            <i class="fa-solid fa-box-archive me-2"></i> Inventory Logs
-        </h1>
-        <button class="btn btn-outline-secondary shadow-sm" onclick="window.location.reload();">
-            <i class="fa-solid fa-sync-alt me-2"></i> Refresh Log
-        </button>
+<div class="container-fluid px-4">
+    <div class="row align-items-center mb-4">
+        <div class="col-md-6">
+            <h3 class="fw-bold text-dark m-0">Inventory Activity</h3>
+            <p class="text-muted small">Monitor stock movements and system adjustments</p>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <button class="btn btn-outline-dark btn-sm shadow-sm" onclick="window.location.href='inventory_logs.php'">
+                <i class="fa-solid fa-sync"></i> Reset View
+            </button>
+        </div>
     </div>
 
-    <div class="card shadow mb-5">
-        <div class="card-header bg-white py-3">
-            <h5 class="mb-0 fw-semibold text-muted">
-                Showing Most Recent Inventory Changes
-            </h5>
-        </div>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-center">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <input type="text" name="search" class="form-control form-control-sm search-input" placeholder="Search SKU or Product..." value="<?= htmlspecialchars($search) ?>">
+                        <button class="btn btn-dark btn-sm search-btn" type="submit">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="small text-muted">Show:</label>
+                        <select name="limit" class="form-select form-select-sm" onchange="this.form.submit()" style="width: 100px;">
+                            <option value="10" <?= $limit == 10 ? 'selected' : '' ?>>10</option>
+                            <option value="20" <?= $limit == 20 ? 'selected' : '' ?>>20</option>
+                            <option value="50" <?= $limit == 50 ? 'selected' : '' ?>>50</option>
+                            <option value="100" <?= $limit == 100 ? 'selected' : '' ?>>100</option>
+                        </select>
+                    </div>
+                </div>
 
+                <div class="col-md-5 text-end">
+                    <span class="badge bg-light text-dark border p-2">
+                        Total Logs: <?= $total_results ?>
+                    </span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
-
                 <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
+                    <thead>
                         <tr>
-                            <th>#</th>
-                            <th>Timestamp</th>
-                            <th>Action Type</th>
-                            <th>Product (SKU)</th>
-                            <th>Quantity Change</th>
-                            <th>User</th>
-                            <th>Details</th>
-                            <th>Remarks</th>
+                            <th class="ps-4">Timestamp</th>
+                            <th>Action</th>
+                            <th>Product Information</th>
+                            <th class="text-center">Qty</th>
+                            <th>Responsible User</th>
+                            <th class="pe-4">Details/Remarks</th>
                         </tr>
                     </thead>
-
                     <tbody>
-                    <?php 
-                    if ($inventoryLogsResult && $inventoryLogsResult->num_rows > 0) {
-                        while ($row = $inventoryLogsResult->fetch_assoc()) {
+                        <?php if ($inventoryLogsResult && $inventoryLogsResult->num_rows > 0): ?>
+                            <?php while ($row = $inventoryLogsResult->fetch_assoc()): 
+                                $action = $row['action_type'];
+                                
+                                // Logic for Icons and Colors based on Action
+                                $badge_class = 'bg-light text-dark border';
+                                $icon = 'fa-circle-info';
 
-                            $user_name = trim($row['first_name'] . ' ' . $row['last_name']);
-                            $user_display = $user_name ?: "System/Admin";
+                                if (stripos($action, 'Add') !== false) {
+                                    $badge_class = 'bg-success text-white';
+                                    $icon = 'fa-plus-circle';
+                                } elseif (stripos($action, 'Edit') !== false || stripos($action, 'Update') !== false) {
+                                    $badge_class = 'bg-warning text-dark';
+                                    $icon = 'fa-pen-to-square';
+                                } elseif (stripos($action, 'Delete') !== false) {
+                                    $badge_class = 'bg-danger text-white';
+                                    $icon = 'fa-trash-can';
+                                } elseif (stripos($action, 'Damage') !== false) {
+                                    $badge_class = 'bg-secondary text-white';
+                                    $icon = 'fa-screwdriver-wrench';
+                                }
 
-                            $product_display = !empty($row['product_name']) && !empty($row['sku'])
-                                ? "{$row['product_name']} ({$row['sku']})"
-                                : (!empty($row['product_name']) ? $row['product_name'] : "N/A");
-
-                            $time_display = time_ago($row['timestamp']);
-
-                            $row_class = '';
-                            $icon = '';
-                            $qty_display = 'N/A';
-
-                            switch ($row['action_type']) {
-                                case 'Add Product':
-                                    $row_class = 'table-row-add';
-                                    $icon = '<i class="fa-solid fa-arrow-circle-up text-success me-1"></i>';
-                                    $qty_display = "+" . $row['quantity_change'];
-                                    break;
-
-                                case 'Product Edit':
-                                    $row_class = 'table-row-update';
-                                    $icon = '<i class="fa-solid fa-pen-to-square text-warning me-1"></i>';
-                                    $qty_display = $row['quantity_change'] == 0
-                                        ? '—'
-                                        : ($row['quantity_change'] > 0 ? '+' : '') . $row['quantity_change'];
-                                    break;
-
-                                case 'New Product':
-                                    $row_class = 'table-row-update';
-                                    $icon = '<i class="fa-solid fa-box-open text-info me-1"></i>';
-                                    break;
-
-                                default:
-                                    $icon = '<i class="fa-solid fa-history text-secondary me-1"></i>';
-                            }
-
-                            echo "<tr class='{$row_class}'>";
-                            echo "<td>{$row['log_id']}</td>";
-                            echo "<td><span title='{$row['timestamp']}'>{$time_display}</span></td>";
-                            echo "<td>{$icon} {$row['action_type']}</td>";
-                            echo "<td>{$product_display}</td>";
-                            echo "<td class='fw-bold'>{$qty_display}</td>";
-                            echo "<td>{$user_display}</td>";
-                            echo "<td>{$row['log_details']}</td>";
-                            echo "<td>{$row['remarks']}</td>";
-                            echo "</tr>";
-                        }
-                    } else {
-                        echo '<tr>
-                                <td colspan="8" class="text-center text-muted py-5">
-                                    The inventory activity log is currently empty.
+                                $qty = (int)$row['quantity_change'];
+                                $qty_color = $qty > 0 ? 'text-success' : ($qty < 0 ? 'text-danger' : 'text-muted');
+                            ?>
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark" style="font-size: 13px;"><?= time_ago($row['timestamp']) ?></div>
+                                    <small class="text-muted" style="font-size: 10px;"><?= date('d M Y, h:i A', strtotime($row['timestamp'])) ?></small>
                                 </td>
-                              </tr>';
-                    }
-                    ?>
+                                <td>
+                                    <span class="badge rounded-pill status-pill <?= $badge_class ?> shadow-sm">
+                                        <i class="fa-solid <?= $icon ?> me-1"></i> <?= strtoupper($action) ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold"><?= htmlspecialchars($row['product_name'] ?? 'N/A') ?></div>
+                                    <small class="text-muted text-uppercase" style="font-size: 11px;"><?= htmlspecialchars($row['sku'] ?? 'NO-SKU') ?></small>
+                                </td>
+                                <td class="text-center fw-bold <?= $qty_color ?>">
+                                    <?php if($qty > 0): ?>
+                                        <i class="fa-solid fa-arrow-trend-up me-1"></i>+<?= $qty ?>
+                                    <?php elseif($qty < 0): ?>
+                                        <i class="fa-solid fa-arrow-trend-down me-1"></i><?= $qty ?>
+                                    <?php else: ?>
+                                        <span class="text-muted">--</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 24px; height: 24px; font-size: 10px;">
+                                            <?= strtoupper(substr($row['first_name'], 0, 1)) ?>
+                                        </div>
+                                        <span class="small"><?= htmlspecialchars($row['first_name'] . ' ' . $row['last_name'] ?: 'System') ?></span>
+                                    </div>
+                                </td>
+                                <td class="pe-4">
+                                    <div class="small text-dark fw-medium"><?= htmlspecialchars($row['log_details']) ?></div>
+                                    <div class="text-muted small text-italic">"<?= htmlspecialchars($row['remarks'] ?: 'No remarks provided') ?>"</div>
+                                </td>
+                            </tr>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr><td colspan="6" class="text-center py-5 text-muted">No logs matching your criteria.</td></tr>
+                        <?php endif; ?>
                     </tbody>
                 </table>
-
             </div>
+        </div>
+
+        <div class="card-footer bg-white border-0 py-4">
+            <nav>
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    <li class="page-item my-1 <?= $page <= 1 ? 'disabled' : '' ?>">
+                        <a class="page-link" href="?page=<?= $page-1 ?>&limit=<?= $limit ?>&search=<?= $search ?>"><i class="fa-solid fa-angle-left"></i></a>
+                    </li>
+                    <?php for($i=1; $i<=$total_pages; $i++): ?>
+                        <?php if($i == 1 || $i == $total_pages || ($i >= $page - 1 && $i <= $page + 1)): ?>
+                            <li class="page-item <?= $page == $i ? 'active' : '' ?>">
+                                <a class="page-link text-dark" href="?page=<?= $i ?>&limit=<?= $limit ?>&search=<?= $search ?>"><?= $i ?></a>
+                            </li>
+                        <?php elseif($i == $page - 2 || $i == $page + 2): ?>
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        <?php endif; ?>
+                    <?php endfor; ?>
+                    <li class="page-item my-1 <?= $page >= $total_pages ? 'disabled' : '' ?>">
+                        <a class="page-link" href="?page=<?= $page+1 ?>&limit=<?= $limit ?>&search=<?= $search ?>"><i class="fa-solid fa-angle-right"></i></a>
+                    </li>
+                </ul>
+            </nav>
         </div>
     </div>
 </div>

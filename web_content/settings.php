@@ -4,207 +4,199 @@
     include "../render/connection.php";
     include "../render/modal.php";
 
-    // --- NEW: 1. Fetch System Settings from Database ---
+    // --- Fetch System Settings ---
     $settings = [];
     if (isset($conn)) {
-        // This query fetches all rows from a configuration table (key-value pair model)
         $sql_settings = "SELECT setting_key, setting_value FROM system_settings";
         $result_settings = $conn->query($sql_settings);
         
         if ($result_settings && $result_settings->num_rows > 0) {
             while ($row = $result_settings->fetch_assoc()) {
-                // Populate the $settings array: $settings['app_name'] = 'Inventory Manager Pro'
                 $settings[$row['setting_key']] = $row['setting_value'];
             }
         }
     }
-    // --- END NEW PHP BLOCK ---
-
 ?>
 
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>System Settings</title>
-        <style>
-            /* Fix for fixed-top Navbar */
-            body {
-                padding-top: 56px; 
-            }
-            .settings-nav .nav-link {
-                text-align: left;
-                padding: 1rem 1.5rem;
-            }
-            .settings-nav .nav-link.active {
-                border-left: 3px solid var(--bs-primary);
-                background-color: var(--bs-light);
-            }
-        </style>
-    </head>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>System Settings | Stock Focus</title>
+    <style>
+        body { background-color: #f4f7f6; padding-top: 80px; }
+        .settings-card { border: none; border-radius: 15px; overflow: hidden; }
+        
+        /* Sidebar Styling */
+        .settings-nav { background-color: #fff; height: 100%; }
+        .settings-nav .nav-link {
+            text-align: left;
+            padding: 1.2rem 1.5rem;
+            color: #495057;
+            border-bottom: 1px solid #f8f9fa;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .settings-nav .nav-link i { width: 25px; font-size: 1.1rem; }
+        .settings-nav .nav-link:hover { background-color: #f8f9fa; color: #0d6efd; }
+        .settings-nav .nav-link.active {
+            color: #0d6efd;
+            background-color: #e7f1ff;
+            border-left: 4px solid #0d6efd;
+        }
 
-    <body class="bg-light <?php echo $body_class; ?>">
+        /* Form Styling */
+        .form-label { font-weight: 600; font-size: 0.9rem; color: #333; margin-top: 10px; }
+        .form-control, .form-select { border-radius: 8px; padding: 10px; }
+        .section-title { font-weight: 700; color: #212529; margin-bottom: 0.5rem; }
+    </style>
+</head>
 
-        <?php include "../nav/header.php"; ?> 
+<body>
+    <?php include "../nav/header.php"; ?> 
 
-        <div class="container-fluid mt-4">
-            
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="fw-light text-body"><i class="fa-solid fa-gears me-2"></i> System Settings</h1> 
+    <div class="container pb-5">
+        <div class="row mb-4">
+            <div class="col-12 d-md-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="fw-bold text-dark"><i class="fa-solid fa-gears me-2 text-primary"></i> System Settings</h2>
+                    <p class="text-muted">Global configuration for application behavior and inventory logic.</p>
+                </div>
                 
-                <?php 
-                    // Display Status Message (from update_settings.php redirect)
-                    if (isset($_GET['status']) && isset($_GET['message'])) {
-                        $alert_class = ($_GET['status'] == 'success') ? 'alert-success' : 'alert-danger';
-                        echo '<div class="alert ' . $alert_class . ' alert-dismissible fade show" role="alert" style="width: 400px;">';
-                        echo htmlspecialchars($_GET['message']);
-                        echo '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>';
-                    }
-                ?>
+                <?php if (isset($_GET['status'])): ?>
+                    <div class="alert <?= ($_GET['status'] == 'success') ? 'alert-success' : 'alert-danger'; ?> alert-dismissible fade show shadow-sm mb-0" role="alert">
+                        <i class="fa-solid <?= ($_GET['status'] == 'success') ? 'fa-check-circle' : 'fa-circle-xmark'; ?> me-2"></i>
+                        <?= htmlspecialchars($_GET['message'] ?? ''); ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
             </div>
+        </div>
 
-            <div class="card shadow mb-5">
-                <div class="card-body p-0">
-                    <div class="row g-0">
-                        
-                        <div class="col-lg-3 border-end">
-                            <div class="list-group list-group-flush settings-nav" id="settingsTabs" role="tablist">
-                                <a class="list-group-item list-group-item-action active" id="general-tab" data-bs-toggle="list" href="#general" role="tab" aria-controls="general" aria-selected="true">
-                                    <i class="fa-solid fa-sliders me-3"></i> <b>General</b> Settings
-                                </a>
-                                <a class="list-group-item list-group-item-action" id="inventory-tab" data-bs-toggle="list" href="#inventory" role="tab" aria-controls="inventory">
-                                    <i class="fa-solid fa-box-open me-3"></i> <b>Inventory</b> Rules
-                                </a>
-                                <a class="list-group-item list-group-item-action" id="notifications-tab" data-bs-toggle="list" href="#notifications" role="tab" aria-controls="notifications">
-                                    <i class="fa-solid fa-bell me-3"></i> <b>Notifications</b> & Alerts
-                                </a>
-                                <a class="list-group-item list-group-item-action" id="backup-tab" data-bs-toggle="list" href="#backup" role="tab" aria-controls="backup">
-                                    <i class="fa-solid fa-database me-3"></i> <b>Backup</b> & Data
-                                </a>
-                            </div>
+        <div class="card shadow-sm settings-card">
+            <div class="card-body p-0">
+                <div class="row g-0">
+                    <div class="col-lg-3 border-end">
+                        <div class="nav flex-column nav-pills settings-nav" id="settingsTabs" role="tablist">
+                            <button class="nav-link active" id="general-tab" data-bs-toggle="pill" data-bs-target="#general" type="button" role="tab"><i class="fa-solid fa-desktop me-2"></i> General</button>
+                            <button class="nav-link" id="inventory-tab" data-bs-toggle="pill" data-bs-target="#inventory" type="button" role="tab"><i class="fa-solid fa-boxes-stacked me-2"></i> Inventory Rules</button>
+                            <button class="nav-link" id="notifications-tab" data-bs-toggle="pill" data-bs-target="#notifications" type="button" role="tab"><i class="fa-solid fa-bell me-2"></i> Notifications</button>
+                            <button class="nav-link" id="backup-tab" data-bs-toggle="pill" data-bs-target="#backup" type="button" role="tab"><i class="fa-solid fa-database me-2"></i> Backup & Data</button>
                         </div>
+                    </div>
 
-                        <div class="col-lg-9 p-4">
-                            <div class="tab-content" id="nav-tabContent">
-                                
-                                <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="general-tab">
-                                    <h3>General System Configuration</h3>
-                                    <p class="text-muted">Configure basic application appearance and behavior.</p>
-                                    <hr>
-                                    <form method="POST" action="../src/php_script/update_settings.php">
-                                        <div class="mb-3">
-                                            <label for="appName" class="form-label">Application Name</label>
-                                            <input type="text" class="form-control" id="appName" name="app_name" value="<?php echo htmlspecialchars($settings['app_name'] ?? 'Inventory Manager Pro'); ?>" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="dateFormat" class="form-label">Default Date Format</label>
-                                            <select class="form-select" id="dateFormat" name="date_format">
-                                                <option value="YYYY-MM-DD (2025-12-05)" <?php if (($settings['date_format'] ?? '') == 'YYYY-MM-DD (2025-12-05)') echo 'selected'; ?>>YYYY-MM-DD (2025-12-05)</option>
-                                                <option value="MM/DD/YYYY (12/05/2025)" <?php if (($settings['date_format'] ?? '') == 'MM/DD/YYYY (12/05/2025)') echo 'selected'; ?>>MM/DD/YYYY (12/05/2025)</option>
-                                                <option value="DD/MM/YYYY (05/12/2025)" <?php if (($settings['date_format'] ?? '') == 'DD/MM/YYYY (05/12/2025)') echo 'selected'; ?>>DD/MM/YYYY (05/12/2025)</option>
-                                            </select>
-                                        </div>
-                                        <button type="submit" class="btn btn-primary mt-3"><i class="fa-solid fa-save me-2"></i> Save General Settings</button>
-                                    </form>
-                                </div>
-
-                                <div class="tab-pane fade" id="inventory" role="tabpanel" aria-labelledby="inventory-tab">
-                                    <h3>Inventory Management Rules</h3>
-                                    <p class="text-muted">Set global rules for stock thresholds, liquidation percentage, and EOL duration.</p>
-                                    <hr>
-                                    <form method="POST" action="../src/php_script/update_settings.php">
-                                        <div class="mb-3">
-                                            <label for="lowStockThreshold" class="form-label">Global Low Stock Percentage (%)</label>
-                                            <input type="number" class="form-control" id="lowStockThreshold" name="low_stock_threshold_percent" 
-                                                value="<?php echo htmlspecialchars($settings['low_stock_threshold_percent'] ?? '15'); ?>" min="1" max="100" required>
-                                            <small class="form-text text-muted">A warning status will trigger if stock drops below this percentage of the maximum capacity.</small>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label for="liquidationPercent" class="form-label">Global Liquidation Percentage (%)</label>
-                                            <input type="number" class="form-control" id="liquidationPercent" name="liquidation_percentage" 
-                                                value="<?php echo htmlspecialchars($settings['liquidation_percentage'] ?? '20'); ?>" min="0" max="100" required>
-                                            <small class="form-text text-muted">The percentage of stock to be liquidated for slow-moving items.</small>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label for="eolDuration" class="form-label">Default EOL Duration (Years)</label>
-                                            <input type="number" class="form-control" id="eolDuration" name="eol_duration_years" 
-                                                value="<?php echo htmlspecialchars($settings['eol_duration_years'] ?? '3'); ?>" min="1" max="50" required>
-                                            <small class="form-text text-muted">The default number of years after which an item is considered End-of-Life.</small>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label for="defaultUnit" class="form-label">Default Unit of Measure</label>
-                                            <select class="form-select" id="defaultUnit" name="default_unit_of_measure">
-                                                <option value="Pieces" <?php if (($settings['default_unit_of_measure'] ?? '') == 'Pieces') echo 'selected'; ?>>Pieces</option>
-                                                <option value="Units" <?php if (($settings['default_unit_of_measure'] ?? '') == 'Units') echo 'selected'; ?>>Units</option>
-                                                <option value="Meters" <?php if (($settings['default_unit_of_measure'] ?? '') == 'Meters') echo 'selected'; ?>>Meters</option>
-                                                <option value="Kilograms" <?php if (($settings['default_unit_of_measure'] ?? '') == 'Kilograms') echo 'selected'; ?>>Kilograms</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="mb-3 form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="autoAssignSKU" name="auto_assign_sku" value="1" 
-                                                <?php if (($settings['auto_assign_sku'] ?? '0') == '1') echo 'checked'; ?>>
-                                            <label class="form-check-label" for="autoAssignSKU">Auto-Assign SKU/ID on new product creation</label>
-                                        </div>
-
-                                        <button type="submit" class="btn btn-primary mt-3"><i class="fa-solid fa-save me-2"></i> Save Inventory Rules</button>
-                                    </form>
-                                </div>
-
-
-                                <div class="tab-pane fade" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">
-                                    <h3>Notification Preferences</h3>
-                                    <p class="text-muted">Manage system alerts and communication channels.</p>
-                                    <hr>
-                                    <form method="POST" action="../src/php_script/update_settings.php">
-                                        <div class="mb-3">
-                                            <label class="form-label">Trigger Events</label>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="triggerLowStock" name="trigger_low_stock" value="1" <?php if (($settings['trigger_low_stock'] ?? '0') == '1') echo 'checked'; ?>>
-                                                <label class="form-check-label" for="triggerLowStock">
-                                                    <i class="fa-solid fa-exclamation-triangle me-1 text-warning"></i> Low Stock Warning
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="triggerNewUser" name="trigger_new_user" value="1" <?php if (($settings['trigger_new_user'] ?? '0') == '1') echo 'checked'; ?>>
-                                                <label class="form-check-label" for="triggerNewUser">
-                                                    <i class="fa-solid fa-user-plus me-1 text-primary"></i> New User Account Created
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <button type="submit" class="btn btn-primary mt-3"><i class="fa-solid fa-save me-2"></i> Save Notification Settings</button>
-                                    </form>
-                                </div>
-                                
-                                <div class="tab-pane fade" id="backup" role="tabpanel" aria-labelledby="backup-tab">
-                                    <h3>Data Management and Backup</h3>
-                                    <p class="text-muted">Tools for exporting data and managing backups.</p>
-                                    <hr>
-                                    <div class="alert alert-info">
-                                        <i class="fa-solid fa-clock-rotate-left me-2"></i> Last automatic backup: **December 4, 2025, 2:00 AM**.
+                    <div class="col-lg-9 bg-white">
+                        <div class="tab-content p-4 p-md-5" id="settingsTabContent">
+                            
+                            <div class="tab-pane fade show active" id="general" role="tabpanel">
+                                <h4 class="section-title">General Configuration</h4>
+                                <p class="small text-muted mb-4">Update the application identity and regional formats.</p>
+                                <form method="POST" action="../src/php_script/update_settings.php">
+                                    <div class="mb-3">
+                                        <label class="form-label">Application Name</label>
+                                        <input type="text" class="form-control" name="app_name" value="<?= htmlspecialchars($settings['app_name'] ?? 'Inventory Manager Pro'); ?>" required>
                                     </div>
-                                    
-                                    <form method="POST" action="../src/php_script/backup_actions.php" class="d-grid gap-3">
-                                        <button type="submit" name="action" value="export_inventory_csv" class="btn btn-success btn-lg">
-                                            <i class="fa-solid fa-file-export me-2"></i> Export All Inventory Data (.csv)
-                                        </button>
-                                        
-                                        <button type="submit" name="action" value="run_db_backup" class="btn btn-warning btn-lg">
-                                            <i class="fa-solid fa-database me-2"></i> Run Manual Database Backup Now (SQL Dump)
-                                        </button>
-                                    </form>
-                                </div>
-                                
+                                    <div class="mb-4">
+                                        <label class="form-label">Date Display Format</label>
+                                        <select class="form-select" name="date_format">
+                                            <option value="YYYY-MM-DD" <?= (($settings['date_format'] ?? '') == 'YYYY-MM-DD') ? 'selected' : ''; ?>>ISO (2025-12-05)</option>
+                                            <option value="MM/DD/YYYY" <?= (($settings['date_format'] ?? '') == 'MM/DD/YYYY') ? 'selected' : ''; ?>>US (12/05/2025)</option>
+                                            <option value="DD/MM/YYYY" <?= (($settings['date_format'] ?? '') == 'DD/MM/YYYY') ? 'selected' : ''; ?>>UK/EU (05/12/2025)</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary px-4 shadow-sm"><i class="fa-solid fa-floppy-disk me-2"></i> Save General</button>
+                                </form>
                             </div>
+
+                            <div class="tab-pane fade" id="inventory" role="tabpanel">
+                                <h4 class="section-title">Inventory Rules & Logic</h4>
+                                <p class="small text-muted mb-4">Define how the system calculates stock health and lifecycle.</p>
+                                <form method="POST" action="../src/php_script/update_settings.php">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Low Stock Threshold (%)</label>
+                                            <input type="number" class="form-control" name="low_stock_threshold_percent" value="<?= htmlspecialchars($settings['low_stock_threshold_percent'] ?? '15'); ?>" min="1" max="100">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Liquidation Alert (%)</label>
+                                            <input type="number" class="form-control" name="liquidation_percentage" value="<?= htmlspecialchars($settings['liquidation_percentage'] ?? '20'); ?>" min="0" max="100">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Standard EOL Duration (Years)</label>
+                                        <input type="number" class="form-control" name="eol_duration_years" value="<?= htmlspecialchars($settings['eol_duration_years'] ?? '3'); ?>">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary px-4 shadow-sm"><i class="fa-solid fa-floppy-disk me-2"></i> Save Rules</button>
+                                </form>
+                            </div>
+
+                            <div class="tab-pane fade" id="notifications" role="tabpanel">
+                                <h4 class="section-title">Notification Channels</h4>
+                                <p class="small text-muted mb-4">Choose which events trigger system-wide alerts.</p>
+                                <form method="POST" action="../src/php_script/update_settings.php">
+                                    <div class="list-group list-group-flush border rounded mb-4">
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-0">Low Stock Warnings</h6>
+                                                <small class="text-muted">Notify admins when items reach threshold.</small>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" name="trigger_low_stock" value="1" <?= (($settings['trigger_low_stock'] ?? '0') == '1') ? 'checked' : ''; ?>>
+                                            </div>
+                                        </div>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="mb-0">New User Registration</h6>
+                                                <small class="text-muted">Alert system when a new account is created.</small>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" name="trigger_new_user" value="1" <?= (($settings['trigger_new_user'] ?? '0') == '1') ? 'checked' : ''; ?>>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary px-4 shadow-sm"><i class="fa-solid fa-floppy-disk me-2"></i> Update Preferences</button>
+                                </form>
+                            </div>
+
+                            <div class="tab-pane fade" id="backup" role="tabpanel">
+                                <h4 class="section-title">Data Management</h4>
+                                <p class="small text-muted mb-4">Export your database or download inventory snapshots.</p>
+                                
+                                <div class="p-3 bg-light rounded border mb-4 d-flex align-items-center">
+                                    <div class="bg-white rounded p-3 me-3 border shadow-sm">
+                                        <i class="fa-solid fa-clock-rotate-left text-info fa-2x"></i>
+                                    </div>
+                                    <div>
+                                        <span class="d-block small text-muted text-uppercase fw-bold">Last Snapshot</span>
+                                        <span class="fw-bold">Dec 4, 2025 - 02:00 AM</span>
+                                    </div>
+                                </div>
+
+                                <form method="POST" action="../src/php_script/backup_actions.php">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <button type="submit" name="action" value="export_inventory_csv" class="btn btn-outline-success w-100 h-100 py-3">
+                                                <i class="fa-solid fa-file-csv fa-2x d-block mb-2"></i>
+                                                Export Inventory CSV
+                                            </button>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <button type="submit" name="action" value="run_db_backup" class="btn btn-outline-warning w-100 h-100 py-3">
+                                                <i class="fa-solid fa-download fa-2x d-block mb-2"></i>
+                                                Download SQL Dump
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-    </body>
+</body>
 </html>

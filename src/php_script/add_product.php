@@ -2,9 +2,11 @@
 session_start();
 include '../../render/connection.php';
 
+// Ensure MySQLi throws exceptions so the try-catch block actually works
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
 $user_id = $_SESSION['user_id'] ?? 1;
 
-// Allow POST only
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: ../../web_content/inventory.php");
     exit;
@@ -19,20 +21,14 @@ $categoryId    = (int)$_POST['productCategory'];
 $unitCost      = (float)$_POST['unitCost'];
 $initialStock  = (int)$_POST['initialStock'];
 $minThreshold  = (int)($_POST['minThreshold'] ?? 0);
-$location      = trim($_POST['location']);   // ✅ ADDED
-$status        = trim($_POST['status']);     // ✅ ADDED
+$location      = trim($_POST['location']); 
+$status        = trim($_POST['status']); // This will be saved into the 'condition' column
 $remarks       = trim($_POST['remarks']);
 
 /* -----------------------------
    2. Validation
 ------------------------------ */
-if (
-    $productName === '' ||
-    $brand === '' ||
-    $location === '' ||
-    $status === '' ||
-    $categoryId <= 0
-) {
+if ($productName === '' || $brand === '' || $location === '' || $status === '' || $categoryId <= 0) {
     header("Location: ../../web_content/inventory.php?error=Missing required fields");
     exit;
 }
@@ -62,25 +58,29 @@ $sku = strtoupper(substr(md5(uniqid('', true)), 0, 8));
 mysqli_begin_transaction($conn);
 
 try {
-
-    // Insert product (✅ location & status included)
+    // Note: 'condition' is a reserved word, so we use backticks: `condition`
     $stmt = $conn->prepare("
-        INSERT INTO products
-        (sku, product_name, brand, category_id, stock_level, min_threshold, unit_cost, location, status, remarks)
+        INSERT INTO products 
+        (sku, product_name, brand, category_id, stock_level, min_threshold, unit_cost, location, `condition`, remarks) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
+    // Mapping:
+    // s - sku, s - productName, s - brand
+    // i - categoryId, i - initialStock, i - minThreshold
+    // d - unitCost
+    // s - location, s - status (into condition), s - remarks
     $stmt->bind_param(
-        "sssiiidsss",
-        $sku,
-        $productName,
-        $brand,
-        $categoryId,
-        $initialStock,
-        $minThreshold,
-        $unitCost,
-        $location,
-        $status,
+        "sssiiidsss", 
+        $sku, 
+        $productName, 
+        $brand, 
+        $categoryId, 
+        $initialStock, 
+        $minThreshold, 
+        $unitCost, 
+        $location, 
+        $status, 
         $remarks
     );
 
@@ -90,8 +90,8 @@ try {
 
     // Insert inventory log
     $log = $conn->prepare("
-        INSERT INTO inventory_log
-        (product_id, user_id, action_type, quantity_change, log_details)
+        INSERT INTO inventory_log 
+        (product_id, user_id, action_type, quantity_change, log_details) 
         VALUES (?, ?, 'Add Product', ?, 'Initial stock added')
     ");
 
@@ -106,6 +106,7 @@ try {
 
 } catch (Exception $e) {
     mysqli_rollback($conn);
-    header("Location: ../../web_content/inventory.php?error=Database error");
+    // Redirect with the actual error message for debugging
+    header("Location: ../../web_content/inventory.php?error=" . urlencode($e->getMessage()));
     exit;
 }
