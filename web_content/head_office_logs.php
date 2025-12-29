@@ -2,23 +2,7 @@
     session_start();
     include "../src/cdn/cdn_links.php";
     include "../render/connection.php";
-
-    // 1. We now pull from head_office_logs
-    // 2. We don't need the WHERE clause to be strict because everything 
-    //    in this table is ALREADY a Head Office allocation.
-    $sql = "SELECT l.*, u.username, p.product_name, p.sku 
-            FROM head_office_logs l
-            LEFT JOIN users u ON l.user_id = u.user_id
-            LEFT JOIN products p ON l.product_id = p.product_id
-            ORDER BY l.created_at DESC";
-
-    $result = mysqli_query($conn, $sql);
-    
-    if (!$result) {
-        die("Query Failed: " . mysqli_error($conn));
-    }
-
-    $logs = mysqli_fetch_all($result, MYSQLI_ASSOC);
+    include "../src/fetch/head_office_logs_querry.php";
 ?>
 
 <!doctype html>

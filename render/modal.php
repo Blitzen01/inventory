@@ -27,6 +27,7 @@
 </div>
 <!-- add category modal end -->
 
+
 <!-- delete category modal start -->
 <div class="modal fade" id="deleteCategoryModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -63,6 +64,7 @@
     </div>
 </div>
 <!-- delete category modal end -->
+
 
 <!-- add product modal start -->
 <div class="modal fade" id="addProductModal" tabindex="-1" aria-hidden="true">
@@ -134,6 +136,7 @@
     </div>
 </div>
 <!-- add product modal end -->
+
 
 <!-- add user modal start -->
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
@@ -209,6 +212,7 @@
 </div>
 <!-- add user modal end -->
 
+
 <!-- confirm damage modal start -->
 <div class="modal fade" id="confirmDamageModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -229,6 +233,7 @@
     </div>
 </div>
 <!-- confirm damage modal end -->
+
 
 <!-- allocation modal start -->
 <div class="modal fade" id="allocateModal" tabindex="-1">
@@ -297,6 +302,7 @@
     </div>
 </div>
 <!-- allocation modal end -->
+
 
 <!-- confirm status modal start -->
 <?php
@@ -383,6 +389,7 @@
 ?>
 <!-- confirm status modal end -->
 
+
 <!-- delete user modal start -->
 <?php
     $userQuery = "SELECT * FROM users ORDER BY user_id DESC";
@@ -452,6 +459,7 @@
 </div>
 <?php endwhile; ?>
 <!-- delete user modal end -->
+
 
 <!-- view user modal start -->
 <?php
@@ -542,6 +550,7 @@
 <?php endwhile; ?>
 <!-- view user modal end -->
 
+
 <!-- restore user modal start -->
 <?php
     $archiveQuery = "SELECT * FROM deleted_users ORDER BY deleted_at DESC";
@@ -551,7 +560,6 @@
         while ($drow = mysqli_fetch_assoc($archiveResult)):
             $initials = strtoupper(substr($drow['first_name'], 0, 1) . substr($drow['last_name'], 0, 1));
 ?>
-
 <div class="modal fade" id="restoreUserModal<?= $drow['user_id']; ?>" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered"> 
         <div class="modal-content border-0 shadow-lg" style="border-radius: 25px; overflow: hidden;">
@@ -627,6 +635,7 @@
 </div>
 <!-- restore user modal end -->
 
+
 <!-- wipe user modal start -->
 <div class="modal fade" id="wipeUserModal<?= $drow['user_id']; ?>" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered"> 
@@ -685,7 +694,6 @@
         </div>
     </div>
 </div>
-
 <?php 
         endwhile; 
     endif; 
