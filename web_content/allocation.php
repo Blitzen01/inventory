@@ -3,6 +3,11 @@
     include "../src/cdn/cdn_links.php";
     include "../render/connection.php";
 
+    if($_SESSION['user_type'] == 'Viewer') {
+        echo '<script>window.location.href = "inventory.php";</script>';
+        exit();
+    }
+
     // Fetch Active Allocations
     $sql_active = "SELECT a.*, p.product_name, p.sku, p.brand 
                    FROM product_allocations a 

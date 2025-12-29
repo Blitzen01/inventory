@@ -89,13 +89,14 @@ function isActive($pageName, $currentPage) {
                         <i class="fa-solid fa-boxes-stacked me-1"></i> Inventory
                     </a>
                 </li>
-
+                <?php if ($userType !== 'Viewer'): ?>
                 <li class="nav-item">
                     <a class="nav-link <?php echo isActive('allocation.php', $currentPage); ?>" href="allocation.php">
                         <i class="fa-solid fa-map"></i> Allocation
                     </a>
                 </li>
-
+                <?php endif; ?>
+                
                 <?php if ($userType !== 'Viewer'): ?>
                 <li class="nav-item">
                     <a class="nav-link text-warning <?php echo isActive('damage_monitoring.php', $currentPage); ?>" href="damage_monitoring.php">
@@ -121,6 +122,7 @@ function isActive($pageName, $currentPage) {
                         <li><a class="dropdown-item py-2" href="inventory_logs.php"><i class="fa-solid fa-box-archive me-2 text-info"></i> Inventory Logs</a></li>
                         <li><a class="dropdown-item py-2" href="head_office_logs.php"><i class="fa-solid fa-building me-2 text-info"></i> Head Office Logs</a></li>
                         <li><a class="dropdown-item py-2" href="branch_logs.php"><i class="fa-solid fa-code-branch me-2 text-info"></i> Branch Logs</a></li>
+                        <li><a class="dropdown-item py-2" href="system_logs.php"><i class="fa-solid fa-gears text-info"></i> System Logs</a></li>
                         <li><hr class="dropdown-divider opacity-25"></li>
                         <li><a class="dropdown-item py-2" href="activity_log.php"><i class="fa-solid fa-clock-rotate-left me-2 text-info"></i> Full Activity</a></li>
                     </ul>

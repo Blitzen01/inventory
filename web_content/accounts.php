@@ -1,31 +1,29 @@
 <?php
     session_start();
-
     include "../src/cdn/cdn_links.php";
     include "../render/connection.php";
     include "../render/modal.php";
 
-    // Function to determine the badge class based on status
-    function getStatusBadge($status) {
-        return match (strtolower($status)) {
-            'active'    => 'text-bg-success',
-            'inactive'  => 'text-bg-secondary',
-            'suspended' => 'text-bg-danger',
-            default     => 'text-bg-info',
-        };
-    }
+    // 1. Pagination Logic
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $offset = ($page - 1) * $limit;
 
-    // --- Database Query ---
-    $sql = "SELECT user_id, role_id, first_name, last_name, username, email, phone, role, status, last_login, created_at, profile_image 
-        FROM users 
-        ORDER BY user_id DESC";
+    // 2. Fetch Active Users
+    $count_stmt = $pdo->query("SELECT COUNT(*) FROM users");
+    $total_users = $count_stmt->fetchColumn();
+    $total_pages = ceil($total_users / $limit);
 
-    $users = [];
-    if (isset($pdo) && is_object($pdo)) {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute();
-        $users = $stmt->fetchAll();
-    }
+    $stmt = $pdo->prepare("SELECT * FROM users ORDER BY user_id DESC LIMIT :limit OFFSET :offset");
+    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    $users = $stmt->fetchAll();
+
+    // 3. Fetch Deleted Users
+    $stmt_deleted = $pdo->prepare("SELECT * FROM deleted_users ORDER BY deleted_at DESC");
+    $stmt_deleted->execute();
+    $deleted_users = $stmt_deleted->fetchAll();
 ?> 
 
 <!doctype html>
@@ -33,230 +31,325 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>User Accounts Management</title>
+        <title>User Management</title>
+
         <style>
-            body { padding-top: 56px; }
-            .table-action-btns { min-width: 180px; }
-            .profile-picture-modal {
-                width: 100px; height: 100px; border-radius: 50%;
-                object-fit: cover; border: 3px solid #0d6efd;
+            :root { --glass-bg: rgba(255, 255, 255, 0.9); }
+            body { background-color: #f4f7f6; padding-top: 80px; font-family: 'Segoe UI', sans-serif; }
+            .main-card { border: none; border-radius: 0 0 15px 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); background: var(--glass-bg); backdrop-filter: blur(10px); }
+            
+            /* Tabs Styling */
+            .nav-tabs { border: none; }
+            .nav-tabs .nav-link { border: none; color: #888; font-weight: 600; padding: 12px 25px; border-radius: 12px 12px 0 0; margin-right: 5px; background: rgba(0,0,0,0.03); }
+            .nav-tabs .nav-link.active { background: #fff; color: #0d6efd; box-shadow: 0 -5px 15px rgba(0,0,0,0.05); }
+
+            .table-sm thead th { font-size: 0.65rem; text-transform: uppercase; color: #888; padding: 12px 10px; border-bottom: 2px solid #f1f1f1; }
+            .avatar-wrapper { width: 32px; height: 32px; border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            .initials-fallback { background: #2f2f30; color: white; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; }
+            .status-badge { padding: 4px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+            
+            /* Action Buttons */
+            .action-btn { height: 30px; width: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid #eee; background: white; color: #555; transition: 0.2s; }
+            .action-btn:hover { background: #f8f9fa; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+
+            .confirm-verify-btn:disabled {
+                background-color: #6c757d !important;
+                border-color: #6c757d !important;
+                color: white !important;
+                opacity: 0.6;
+                pointer-events: none;
+                height: auto !important; /* This prevents the 30px height conflict */
+                width: 50% !important;   /* This keeps it at half-width in the modal */
             }
-            .avatar-sm {
-                width: 32px; height: 32px; border-radius: 50%;
-                object-fit: cover; margin-right: 10px;
+
+            .verify-input {
+                border: 2px solid #dee2e6 !important;
+                transition: all 0.3s ease;
+            }
+
+            .toggle-password:hover {
+                color: #212529 !important;
             }
         </style>
     </head>
-    <body class="bg-light">
+    <body>
 
         <?php include "../nav/header.php"; ?> 
 
-        <div class="container-fluid mt-4">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="fw-light text-dark"><i class="fa-solid fa-users-gear me-2"></i> User Management</h1>
-                <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                    <i class="fa-solid fa-user-plus me-2"></i> Add New User
-                </button>
+        <div class="container-fluid px-4">
+            <div class="row align-items-center mb-4">
+                <div class="col-md-6">
+                    <h2 class="fw-bold text-dark m-0">User Management</h2>
+                    <p class="text-muted small">Manage active users and archived records</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <button class="btn btn-primary px-4 py-2 shadow-sm rounded-3 fw-bold" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                        <i class="fa-solid fa-user-plus me-2"></i> New User
+                    </button>
+                </div>
             </div>
 
-            <div class="card shadow border-0">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-semibold text-muted">Registered Users (<?= count($users); ?>)</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Username</th>
-                                    <th>Email</th>
-                                    <th>Role</th>
-                                    <th>Status</th>
-                                    <th>Last Login</th>
-                                    <th class="text-center">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($users)): ?>
-                                    <tr><td colspan="7" class="text-center py-5 text-muted">No users found.</td></tr>
-                                <?php endif; ?>
+            <ul class="nav nav-tabs" id="userTabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" id="active-tab" data-bs-toggle="tab" data-bs-target="#active-content" type="button">
+                        Active Accounts <span class="badge bg-primary ms-2"><?= $total_users ?></span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="deleted-tab" data-bs-toggle="tab" data-bs-target="#deleted-content" type="button">
+                        Archive Log <span class="badge bg-danger ms-2"><?= count($deleted_users) ?></span>
+                    </button>
+                </li>
+            </ul>
 
-                                <?php foreach ($users as $row): 
-                                    // Image Logic
-                                    $default_image = '../src/image/default_profile.png';
-                                    $img_path = $row['profile_image'];
-                                    $image_src = (!empty($img_path) && $img_path !== 'src/image/profile_picture/') ? $img_path : $default_image;
-                                    
-                                    // Role Badge Logic
-                                    $role_class = match(strtolower($row['role'])) {
-                                        'administrator' => 'bg-danger',
-                                        'inventory manager' => 'bg-primary',
-                                        'stock handler' => 'bg-success',
-                                        default => 'bg-secondary'
-                                    };
-                                ?>
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="active-content">
+                    <div class="card main-card">
+                        <div class="p-3 d-flex justify-content-between align-items-center border-bottom bg-white rounded-top">
+                            <form method="GET" class="d-flex align-items-center">
+                                <span class="small text-muted me-2">Show</span>
+                                <select name="limit" onchange="this.form.submit()" class="form-select form-select-sm" style="width: auto;">
+                                    <option value="10" <?= $limit == 10 ? 'selected' : '' ?>>10</option>
+                                    <option value="20" <?= $limit == 20 ? 'selected' : '' ?>>20</option>
+                                    <option value="50" <?= $limit == 50 ? 'selected' : '' ?>>50</option>
+                                </select>
+                            </form>
+                            <div class="text-muted small">Showing <?= count($users) ?> active users</div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle mb-0">
+                                <thead>
                                     <tr>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <img src="<?= $image_src; ?>" class="avatar-sm" alt="profile">
-                                                <span class="fw-bold"><?= htmlspecialchars($row['first_name'] . ' ' . $row['last_name']); ?></span>
-                                            </div>
-                                        </td>
-                                        <td><code class="text-primary"><?= htmlspecialchars($row['username']); ?></code></td>
-                                        <td><small><a href="mailto:<?= htmlspecialchars($row['email']); ?>" class="text-decoration-none"><?= htmlspecialchars($row['email']); ?></a></small></td>
-                                        <td><span class="badge <?= $role_class; ?>"><?= strtoupper(htmlspecialchars($row['role'])); ?></span></td>
-                                        <td>
-                                            <span class="badge <?= $row['status'] === 'active' ? 'bg-success' : 'bg-secondary'; ?>">
-                                                <?= ucfirst(htmlspecialchars($row['status'])); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <small class="<?= empty($row['last_login']) ? 'text-danger' : 'text-muted'; ?>">
-                                                <?= empty($row['last_login']) ? "Never" : date("M d, Y H:i", strtotime($row['last_login'])); ?>
-                                            </small>
-                                        </td>
-                                        <td class="text-center">
-                                            <div class="btn-group shadow-sm">
-                                                <button class="btn btn-sm btn-white border" data-bs-toggle="modal" data-bs-target="#viewUserModal_<?= $row['user_id']; ?>" title="View">
-                                                    <i class="fa-solid fa-eye text-primary"></i>
-                                                </button>
+                                        <th class="ps-3">User Details</th>
+                                        <th>ID</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th class="text-center">Manage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($users as $row): 
+                                        // 1. Basic variables
+                                        $initial = strtoupper(substr($row['first_name'], 0, 1) . substr($row['last_name'], 0, 1));
+                                        $isActive = (strtolower($row['status']) === 'active');
 
-                                                <?php if ($row['user_id'] != $_SESSION['user_id']): ?>
-                                                    <button class="btn btn-sm btn-white border" 
-                                                            data-bs-toggle="modal" data-bs-target="#confirmStatusModal" 
-                                                            data-user-id="<?= $row['user_id']; ?>" 
-                                                            data-action="<?= $row['status'] === 'active' ? 'inactive' : 'active'; ?>"
-                                                            title="<?= $row['status'] === 'active' ? 'Deactivate' : 'Activate'; ?>">
-                                                        <i class="fa-solid fa-power-off <?= $row['status'] === 'active' ? 'text-warning' : 'text-success'; ?>"></i>
+                                        // 2. Role Styling
+                                        $roleName = strtolower($row['role']);
+                                        $roleClass = match(true) {
+                                            str_contains($roleName, 'super')     => 'bg-danger-subtle text-danger border-danger',
+                                            str_contains($roleName, 'admin')     => 'bg-primary-subtle text-primary border-primary',
+                                            str_contains($roleName, 'inventory')   => 'bg-info-subtle text-info border-info',
+                                            str_contains($roleName, 'stock')       => 'bg-warning-subtle text-warning border-warning',
+                                            str_contains($roleName, 'viewer')      => 'bg-secondary-subtle text-secondary border-secondary',
+                                            default                                => 'bg-light text-dark border-dark-subtle',
+                                        };
+                                        
+                                        $roleIcon = match(true) {
+                                            str_contains($roleName, 'super')     => 'fa-shield-heart',
+                                            str_contains($roleName, 'admin')     => 'fa-user-shield',
+                                            str_contains($roleName, 'inventory')   => 'fa-boxes-stacked',
+                                            str_contains($roleName, 'stock')       => 'fa-box-open',
+                                            default                                => 'fa-user',
+                                        };
+
+                                        // 3. RESTRICTION LOGIC (Safe from Undefined Key errors)
+                                        $myRole = strtolower($_SESSION['user_type'] ?? ''); 
+                                        $targetRole = strtolower($row['role'] ?? '');
+                                        $canEdit = false;
+
+                                        if ($myRole === 'super administrator') {
+                                            $canEdit = true; 
+                                        } elseif ($myRole === 'administrator') {
+                                            // Admin can only edit if target is NOT an admin/super admin
+                                            if (!str_contains($targetRole, 'admin')) {
+                                                $canEdit = true;
+                                            }
+                                        }
+                                        
+                                        // Safety: Cannot edit/delete yourself
+                                        if ($row['user_id'] == ($_SESSION['user_id'] ?? 0)) {
+                                            $canEdit = false;
+                                        }
+                                    ?>
+                                        <tr>
+                                            <td class="ps-3">
+                                                <div class="d-flex align-items-center py-1">
+                                                    <div class="avatar-wrapper me-2 shadow-sm">
+                                                        <?php if (!empty($row['profile_image']) && file_exists($row['profile_image'])): ?>
+                                                            <img src="<?= $row['profile_image']; ?>" style="width:100%; height:100%; object-fit:cover;">
+                                                        <?php else: ?>
+                                                            <div class="initials-fallback"><?= $initial; ?></div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-bold text-dark mb-0 small"><?= htmlspecialchars($row['first_name'].' '.$row['last_name']); ?></div>
+                                                        <div class="text-muted" style="font-size: 0.65rem;">@<?= htmlspecialchars($row['username']); ?></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <td><span class="text-muted font-monospace small">#<?= $row['role_id']; ?></span></td>
+
+                                            <td>
+                                                <span class="badge <?= $roleClass ?> border px-2 py-1 small fw-bold" style="font-size: 0.7rem;">
+                                                    <i class="fa-solid <?= $roleIcon ?> me-1"></i>
+                                                    <?= strtoupper(htmlspecialchars($row['role'])); ?>
+                                                </span>
+                                            </td>
+
+                                            <td>
+                                                <span class="status-badge <?= $isActive ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'; ?>">
+                                                    <i class="fa-solid <?= $isActive ? 'fa-check-circle' : 'fa-circle-xmark'; ?>"></i>
+                                                    <?= $isActive ? 'ACTIVATED' : 'DEACTIVATED'; ?>
+                                                </span>
+                                            </td>
+
+                                            <td>
+                                                <div class="d-flex justify-content-center gap-1">
+                                                    <button class="action-btn" data-bs-toggle="modal" data-bs-target="#viewUserModal_<?= $row['user_id']; ?>" title="View Profile">
+                                                        <i class="fa-solid fa-expand text-primary"></i>
+                                                    </button>
+
+                                                    <?php if ($row['user_id'] != $_SESSION['user_id']): ?>
+                                                        
+                                                        <?php if ($canEdit): ?>
+                                                            <button class="action-btn" data-bs-toggle="modal" data-bs-target="#confirmStatusModal<?= $row['user_id']; ?>" title="Change Status">
+                                                                <i class="fa-solid fa-power-off <?= $isActive ? 'text-warning' : 'text-success'; ?>"></i>
+                                                            </button>
+                                                            <button class="action-btn" data-bs-toggle="modal" data-bs-target="#deleteUserModal<?= $row['user_id']; ?>" title="Move to Archive">
+                                                                <i class="fa-solid fa-trash-can text-danger"></i>
+                                                            </button>
+                                                        <?php else: ?>
+                                                            <button class="action-btn" style="opacity: 0.4; cursor: not-allowed;" title="Access Restricted" disabled>
+                                                                <i class="fa-solid fa-lock text-muted"></i>
+                                                            </button>
+                                                            <button class="action-btn" style="opacity: 0.4; cursor: not-allowed;" title="Access Restricted" disabled>
+                                                                <i class="fa-solid fa-ban text-muted"></i>
+                                                            </button>
+                                                        <?php endif; ?>
+
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="deleted-content">
+                    <div class="card main-card border-top border-danger border-4">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-3">Archived User</th>
+                                        <th>Original ID</th>
+                                        <th>Deleted Date</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($deleted_users)): ?>
+                                        <tr><td colspan="4" class="text-center py-4 text-muted small">No archived accounts.</td></tr>
+                                    <?php endif; ?>
+                                    <?php foreach ($deleted_users as $drow): ?>
+                                    <tr>
+                                        <td class="ps-3 opacity-75">
+                                            <div class="fw-bold text-dark small"><?= htmlspecialchars($drow['first_name'].' '.$drow['last_name']); ?></div>
+                                            <div class="text-muted" style="font-size: 0.65rem;"><?= $drow['email']; ?></div>
+                                        </td>
+                                        <td><span class="text-muted font-monospace small">#<?= $drow['role_id']; ?></span></td>
+                                        <td class="small text-danger fw-bold"><?= date("M d, Y", strtotime($drow['deleted_at'])); ?></td>
+                                        <td>
+                                            <div class="d-flex justify-content-center gap-1">
+                                                <div class="d-flex justify-content-center gap-1">
+                                                    <button class="action-btn border-success text-success" 
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#restoreUserModal<?= $drow['user_id']; ?>" 
+                                                            title="Restore Account">
+                                                        <i class="fa-solid fa-rotate-left"></i>
                                                     </button>
                                                     
-                                                    <button class="btn btn-sm btn-white border" 
-                                                            <?= ($row['role'] == "Administrator") ? 'disabled' : ''; ?>
-                                                            data-bs-toggle="modal" data-bs-target="#deleteUserModal" 
-                                                            data-user-id="<?= $row['user_id']; ?>" title="Delete">
-                                                        <i class="fa-regular fa-trash-can text-danger"></i>
+                                                    <button class="action-btn border-danger text-danger" 
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#wipeUserModal<?= $drow['user_id']; ?>" 
+                                                            title="Permanently Wipe">
+                                                        <i class="fa-solid fa-circle-xmark"></i>
                                                     </button>
-                                                <?php else: ?>
-                                                    <button class="btn btn-sm btn-white border" disabled title="Current User">
-                                                        <i class="fa-solid fa-user-check text-muted"></i>
-                                                    </button>
-                                                <?php endif; ?>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
-
-                                    <div class="modal fade" id="viewUserModal_<?= $row['user_id']; ?>" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content border-0 shadow-lg">
-                                                <div class="modal-header bg-primary text-white border-0">
-                                                    <h5 class="modal-title"><i class="fa-solid fa-address-card me-2"></i>User Profile</h5>
-                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                
-                                                <div class="modal-body text-center p-4">
-                                                    <div class="mb-4">
-                                                        <img src="<?= $image_src; ?>" class="rounded-circle shadow-sm mb-3 border border-3 border-light" alt="Profile" style="width: 100px; height: 100px; object-fit: cover;">
-                                                        <h4 class="mb-0 fw-bold"><?= htmlspecialchars($row['first_name'].' '.$row['last_name']); ?></h4>
-                                                        <p class="text-info fw-semibold small">@<?= htmlspecialchars($row['username']); ?></p>
-                                                    </div>
-                                                    
-                                                    <div class="list-group list-group-flush text-start border rounded-3 overflow-hidden">
-                                                        <div class="list-group-item d-flex justify-content-between align-items-center py-3">
-                                                            <span class="text-muted small"><i class="fa-solid fa-envelope me-2"></i>Email</span>
-                                                            <span class="fw-medium"><?= htmlspecialchars($row['email']); ?></span>
-                                                        </div>
-                                                        
-                                                        <div class="list-group-item d-flex justify-content-between align-items-center py-3">
-                                                            <span class="text-muted small"><i class="fa-solid fa-phone me-2"></i>Phone</span>
-                                                            <span class="fw-medium"><?= htmlspecialchars($row['phone'] ?: 'Not Provided'); ?></span>
-                                                        </div>
-                                                        
-                                                        <div class="list-group-item d-flex justify-content-between align-items-center py-3">
-                                                            <span class="text-muted small"><i class="fa-solid fa-user-shield me-2"></i>Access Role</span>
-                                                            <span class="badge <?= $role_class; ?> rounded-pill px-3"><?= strtoupper($row['role']); ?></span>
-                                                        </div>
-
-                                                        <div class="list-group-item d-flex justify-content-between align-items-center py-3">
-                                                            <span class="text-muted small"><i class="fa-solid fa-circle-check me-2"></i>Status</span>
-                                                            <?php 
-                                                                $status = $row['status'] ?? 'Active';
-                                                                $statusColor = ($status === 'Active') ? 'text-success' : 'text-success';
-                                                            ?>
-                                                            <span class="<?= $statusColor; ?> small fw-bold">
-                                                                <i class="fa-solid fa-circle fa-2xs me-1"></i> <?= $status; ?>
-                                                            </span>
-                                                        </div>
-
-                                                        <div class="list-group-item d-flex justify-content-between align-items-center py-3 bg-light">
-                                                            <span class="text-muted small"><i class="fa-solid fa-calendar-day me-2"></i>Member Since</span>
-                                                            <div class="text-end">
-                                                                <?php if (isset($row['created_at']) && !empty($row['created_at'])): ?>
-                                                                    <div class="fw-medium small"><?= date('F j, Y', strtotime($row['created_at'])); ?></div>
-                                                                    <div class="text-muted" style="font-size: 0.75rem;"><?= date('g:i A', strtotime($row['created_at'])); ?></div>
-                                                                <?php else: ?>
-                                                                    <div class="text-muted small">Not Available</div>
-                                                                <?php endif; ?>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div class="modal-footer border-0 pt-0">
-                                                    <button type="button" class="btn btn-outline-secondary w-100 rounded-pill" data-bs-dismiss="modal">Close Details</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                        <a class="page-link shadow-sm" href="?page=<?= $page - 1 ?>&limit=<?= $limit ?>">Previous</a>
+                    </li>
+                    <li class="page-item active"><a class="page-link shadow-sm" href="#"><?= $page ?></a></li>
+                    <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                        <a class="page-link shadow-sm" href="?page=<?= $page + 1 ?>&limit=<?= $limit ?>">Next</a>
+                    </li>
+                </ul>
+            </nav>
         </div>
 
+        <script src="../src/script/add_account_script.js"></script>
         <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                const statusModal = document.getElementById('confirmStatusModal');
-                if(statusModal) {
-                    statusModal.addEventListener('show.bs.modal', function (event) {
-                        const button = event.relatedTarget;
-                        const action = button.getAttribute('data-action');
-                        
-                        document.getElementById('targetUserId').value = button.getAttribute('data-user-id');
-                        document.getElementById('newStatus').value = action;
-                        
-                        const isDeactivating = action === 'inactive';
-                        document.getElementById('statusModalTitle').textContent = isDeactivating ? "Confirm Deactivation" : "Confirm Activation";
-                        document.getElementById('confirmStatusBtn').className = isDeactivating ? "btn btn-danger" : "btn btn-success";
-                    });
+            document.addEventListener('click', function(e) {
+                // 1. Toggle Password Visibility
+                if (e.target.classList.contains('toggle-password')) {
+                    const input = e.target.closest('.position-relative').querySelector('input');
+                    if (input.type === "password") {
+                        input.type = "text";
+                        e.target.classList.replace('fa-eye', 'fa-eye-slash');
+                    } else {
+                        input.type = "password";
+                        e.target.classList.replace('fa-eye-slash', 'fa-eye');
+                    }
                 }
             });
-        </script>
 
-        <div class="modal fade" id="confirmStatusModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-sm modal-dialog-centered">
-                <div class="modal-content border-0 shadow">
-                    <form action="../src/php_script/deactivate_user.php" method="POST">
-                        <div class="modal-header border-0 pb-0">
-                            <h5 class="modal-title fw-bold" id="statusModalTitle">Confirm Action</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body text-center py-4">
-                            <i class="fa-solid fa-circle-exclamation fa-3x text-warning mb-3"></i>
-                            <p class="mb-0">Are you sure you want to change this user's status?</p>
-                            
-                            <input type="hidden" name="user_id" id="targetUserId">
-                            <input type="hidden" name="new_status" id="newStatus">
-                        </div>
-                        <div class="modal-footer border-0 pt-0 justify-content-center">
-                            <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" name="update_status" id="confirmStatusBtn" class="btn px-4">Confirm</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+            document.addEventListener('keyup', function(e) {
+                if (e.target.classList.contains('verify-input')) {
+                    const typedVal = e.target.value;
+                    const modal = e.target.closest('.modal-content');
+                    const sessionPass = modal.querySelector('.session-pass-verify').value;
+                    const actionBtn = modal.querySelector('.confirm-verify-btn');
+
+                    if (typedVal === sessionPass) {
+                        // DIRECT ENABLE
+                        actionBtn.disabled = false; 
+                        actionBtn.removeAttribute('disabled'); 
+                        
+                        // Input border turns Green
+                        e.target.style.border = "2px solid #198754";
+                        e.target.style.boxShadow = "0 0 0 0.25rem rgba(25, 135, 84, 0.25)";
+                    } else {
+                        // DIRECT DISABLE
+                        actionBtn.disabled = true;
+                        
+                        // Input border turns Red if typing, else Gray
+                        if (typedVal.length > 0) {
+                            e.target.style.border = "2px solid #dc3545";
+                            e.target.style.boxShadow = "0 0 0 0.25rem rgba(220, 53, 69, 0.25)";
+                        } else {
+                            e.target.style.border = "2px solid #dee2e6";
+                            e.target.style.boxShadow = "none";
+                        }
+                    }
+                }
+            });
+            </script>
     </body>
 </html>

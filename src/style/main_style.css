@@ -1,0 +1,14 @@
+/* Page transition styles */
+body {
+    opacity: 0;
+    transition: opacity 0.1s ease-in-out;
+}
+
+body.page-loaded {
+    opacity: 1;
+}
+
+/* Ensure navbar stays crisp during transition */
+.navbar-glass {
+    z-index: 1050; /* Stay above content */
+}

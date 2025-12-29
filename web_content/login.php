@@ -37,6 +37,7 @@
                             $_SESSION['logged_in'] = true;
                             $_SESSION['user_id'] = $user['user_id'];
                             $_SESSION['username'] = $username;
+                            $_SESSION['password'] = $password;
                             $_SESSION['user_type'] = $user['role']; 
                             
                             $sql_update_login = "UPDATE users SET last_login = NOW() WHERE user_id = ?";
