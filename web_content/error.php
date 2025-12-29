@@ -50,7 +50,6 @@
                 letter-spacing: -8px;
                 margin: 0;
                 background: linear-gradient(180deg, #fff 30%, #222 100%);
-                -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 line-height: 0.8;
             }

@@ -15,4 +15,4 @@ if (file_exists($login_page)) {
     header('Location: ' . $error_page);
     exit; // Stop script execution after sending the header
 }
-?>
+// ?>
