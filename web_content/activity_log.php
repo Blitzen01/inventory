@@ -166,27 +166,28 @@
                     </div>
                 </div>
 
-                <div class="card-footer bg-white border-0 py-4">
+                <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3 border-top">
+                    <div class="text-muted small">
+                        Showing <b><?= $result_activity_log->num_rows ?></b> of <?= $total_rows ?> items
+                    </div>
                     <nav>
-                        <ul class="pagination pagination-sm justify-content-center mb-0">
+                        <ul class="pagination pagination-sm mb-0">
                             <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-                                <a class="page-link" href="?page=<?= $page-1 ?>&limit=<?= $limit ?>"><i class="fa-solid fa-chevron-left"></i></a>
+                                <a class="page-link" href="?page=<?= $page-1 ?>&limit=<?= $limit ?>&search=<?= urlencode($search) ?>">
+                                    Prev
+                                </a>
                             </li>
 
-                            <?php 
-                            $range = 2; // Show 2 pages before and after current page
-                            for($i = 1; $i <= $total_pages; $i++): 
-                                if($i == 1 || $i == $total_pages || ($i >= $page - $range && $i <= $page + $range)): ?>
-                                    <li class="page-item <?= $page == $i ? 'active' : '' ?>">
-                                        <a class="page-link" href="?page=<?= $i ?>&limit=<?= $limit ?>"><?= $i ?></a>
-                                    </li>
-                                <?php elseif($i == $page - $range - 1 || $i == $page + $range + 1): ?>
-                                    <li class="page-item disabled"><span class="page-link">...</span></li>
-                                <?php endif; 
-                            endfor; ?>
+                            <li class="page-item active">
+                                <span class="page-link bg-dark border-dark text-white">
+                                    <?= $page ?>
+                                </span>
+                            </li>
 
                             <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
-                                <a class="page-link" href="?page=<?= $page+1 ?>&limit=<?= $limit ?>"><i class="fa-solid fa-chevron-right"></i></a>
+                                <a class="page-link" href="?page=<?= $page+1 ?>&limit=<?= $limit ?>&search=<?= urlencode($search) ?>">
+                                    Next
+                                </a>
                             </li>
                         </ul>
                     </nav>

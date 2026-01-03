@@ -5,7 +5,7 @@
 
     $user_type = $_SESSION['user_type'] ?? 'Viewer';
 
-    // --- Fetch System Settings ---
+    // --- 1. Fetch System Settings ---
     $system_settings = [];
     $sql_settings = "SELECT setting_key, setting_value FROM system_settings";
     $result_settings = $conn->query($sql_settings);
@@ -19,11 +19,12 @@
     $eol_years = isset($system_settings['eol_duration_years']) ? intval($system_settings['eol_duration_years']) : 1;
     $liquidation_multiplier = (100 - $liquidation_percent) / 100;
 
-    // --- Fetch Categories for dropdown ---
+    // --- 2. Fetch Categories for dropdown ---
     $result_categories = $conn->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
 
-    // --- Filters Setup ---
-    $search_term = trim($_GET['searchItem'] ?? '');
+    // --- 3. Filters Setup (CLEANED UP) ---
+    // This catches 'search' from your new dashboard and 'searchItem' from the inventory page
+    $search_term = trim($_GET['search'] ?? $_GET['searchItem'] ?? ''); 
     $category_filter = $_GET['category_filter'] ?? '';
     $status_filter = $_GET['status_filter'] ?? '';
     $category_filter = is_numeric($category_filter) ? (int)$category_filter : null;
@@ -32,6 +33,7 @@
     $params = [];
     $param_types = '';
 
+    // Advanced Search Logic (Supports Name, SKU, Brand, Location, etc.)
     if (!empty($search_term)) {
         $search_columns = ['p.sku', 'p.product_name', 'p.brand', 'p.location', 'p.condition', 'p.remarks', 'c.category_name'];
         $like_clauses = [];
@@ -57,13 +59,13 @@
 
     $where_sql = count($where_clauses) > 0 ? " WHERE " . implode(" AND ", $where_clauses) : "";
 
-    // --- Pagination Calculation ---
+    // --- 4. Pagination ---
     $limit = 10; 
     $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
     if ($page < 1) $page = 1;
     $offset = ($page - 1) * $limit;
 
-    // --- Get Total Count ---
+    // --- 5. Get Total Count (For pagination links) ---
     $sql_total_count = "SELECT COUNT(p.product_id) AS total_items FROM products p LEFT JOIN categories c ON p.category_id = c.category_id $where_sql";
     $stmt_count = $conn->prepare($sql_total_count);
     if (!empty($params)) {
@@ -73,7 +75,7 @@
     $total_items = $stmt_count->get_result()->fetch_assoc()['total_items'] ?? 0;
     $total_pages = ceil($total_items / $limit);
 
-    // --- Get Paginated Products ---
+    // --- 6. Get Paginated Products (THE CORRECT QUERY) ---
     $sql_products = "
         SELECT p.*, c.category_name
         FROM products p
@@ -88,10 +90,12 @@
     $paginated_params[] = $limit;
     $paginated_params[] = $offset;
     $paginated_types = $param_types . "ii";
+    
     $stmt_products->bind_param($paginated_types, ...$paginated_params);
     $stmt_products->execute();
     $result_products = $stmt_products->get_result();
 
+    // Helper for pagination links
     function get_page_url($p) {
         $params = $_GET;
         $params['page'] = $p;

@@ -699,3 +699,81 @@
     endif; 
 ?>
 <!-- wipe user modal end -->
+
+<!-- report damage modal start -->
+<div class="modal fade" id="reportDamageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"> <div class="modal-content border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+            <div class="modal-header bg-danger bg-gradient text-white py-3 border-0">
+                <div class="d-flex align-items-center">
+                    <div class="p-2 me-3">
+                        <i class="fa-solid fa-triangle-exclamation fa-lg"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">Report Damage</h5>
+                        <small class="opacity-75">Deduct items from active inventory</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4">
+                <form method="POST" action="../src/php_script/process_damage.php" id="damageForm">
+                    <input type="hidden" name="report_damage" value="1">
+                    
+                    <div class="row g-4">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-secondary small text-uppercase">Select Product</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-box-open text-muted"></i></span>
+                                <select name="product_id" id="productSelect" class="form-select border-start-0 bg-light" required>
+                                    <option value="">Choose a product...</option>
+                                    <?php 
+                                        if($products->num_rows > 0):
+                                            $products->data_seek(0); 
+                                            while ($p = $products->fetch_assoc()): 
+                                    ?>
+                                        <option value="<?= $p['product_id'] ?>" data-stock="<?= $p['stock_level'] ?>">
+                                            <?= htmlspecialchars($p['product_name']) ?>
+                                        </option>
+                                    <?php 
+                                            endwhile; 
+                                        endif;
+                                    ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-secondary small text-uppercase d-flex justify-content-between">
+                                Qty to Report
+                                <span id="stockBadge" class="badge bg-secondary-subtle text-secondary fw-normal">Max: 0</span>
+                            </label>
+                            <input type="number" name="quantity_damaged" id="qtyInput" class="form-control form-control-lg bg-light" min="1" placeholder="0" disabled required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-secondary small text-uppercase">Action</label>
+                            <select name="action_required" class="form-select form-control-lg bg-light" required>
+                                <option value="REPAIR">Repair Item</option>
+                                <option value="REPLACE">Replace Item</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-secondary small text-uppercase">Reason for Damage</label>
+                            <textarea name="reason" class="form-control bg-light" rows="2" placeholder="Describe how it was damaged..." required></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-2 d-flex gap-2">
+                        <button type="button" class="btn btn-link text-muted text-decoration-none w-100" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" id="submitDamage" class="btn btn-danger py-2 w-100 fw-bold shadow-sm">
+                            Submit Report
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- report damage modal end -->

@@ -177,23 +177,28 @@
             </div>
         </div>
 
-        <div class="card-footer bg-white border-0 py-4">
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3 border-top">
+            <div class="text-muted small">
+                <?php 
+                    $start = $offset + 1;
+                    $end = min($offset + $limit, $total_results);
+                ?>
+                Showing <b><?= $start ?></b> to <b><?= $end ?></b> of <?= $total_results ?> items
+            </div>
             <nav>
-                <ul class="pagination pagination-sm justify-content-center mb-0">
-                    <li class="page-item my-1 <?= $page <= 1 ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?page=<?= $page-1 ?>&limit=<?= $limit ?>&search=<?= $search ?>"><i class="fa-solid fa-angle-left"></i></a>
+                <ul class="pagination pagination-sm justify-content-end mb-0">
+                    <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                        <a class="page-link shadow-sm" href="?page=<?= $page - 1 ?>&limit=<?= $limit ?>&search=<?= $search ?>">Prev</a>
                     </li>
-                    <?php for($i=1; $i<=$total_pages; $i++): ?>
-                        <?php if($i == 1 || $i == $total_pages || ($i >= $page - 1 && $i <= $page + 1)): ?>
-                            <li class="page-item <?= $page == $i ? 'active' : '' ?>">
-                                <a class="page-link text-dark" href="?page=<?= $i ?>&limit=<?= $limit ?>&search=<?= $search ?>"><?= $i ?></a>
-                            </li>
-                        <?php elseif($i == $page - 2 || $i == $page + 2): ?>
-                            <li class="page-item disabled"><span class="page-link">...</span></li>
-                        <?php endif; ?>
-                    <?php endfor; ?>
-                    <li class="page-item my-1 <?= $page >= $total_pages ? 'disabled' : '' ?>">
-                        <a class="page-link" href="?page=<?= $page+1 ?>&limit=<?= $limit ?>&search=<?= $search ?>"><i class="fa-solid fa-angle-right"></i></a>
+
+                    <li class="page-item active">
+                        <span class="page-link bg-dark border-dark text-white">
+                            <?= $page ?>
+                        </span>
+                    </li>
+
+                    <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                        <a class="page-link shadow-sm" href="?page=<?= $page + 1 ?>&limit=<?= $limit ?>&search=<?= $search ?>">Next</a>
                     </li>
                 </ul>
             </nav>

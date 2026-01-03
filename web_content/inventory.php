@@ -5,6 +5,7 @@
     include "../render/connection.php";
     include "../render/modal.php";
     include "../src/fetch/inventory_querry.php";
+
 ?>
 
 <!doctype html>
@@ -43,7 +44,7 @@
                     <button class="btn btn-outline-dark bg-white" data-bs-toggle="modal" data-bs-target="#deleteCategoryModal">
                         <i class="fa-solid fa-folder-minus"></i> Remove Category
                     </button>
-                    <button class="btn btn-primary ms-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                    <button class="btn btn-outline-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
                         <i class="fa-solid fa-plus-circle"></i> Add New Item
                     </button>
                 </div>

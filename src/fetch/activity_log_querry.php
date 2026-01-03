@@ -1,5 +1,5 @@
 <?php
-    // --- PAGINATION & SEARCH LOGIC ---
+    // --- 1. LOGIC (Moved to top to define variables for the HTML) ---
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 15;
     $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
     $search = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : '';
@@ -31,22 +31,19 @@
             p.product_name LIKE '%$search%' OR 
             p.sku LIKE '%$search%' OR 
             u.first_name LIKE '%$search%' OR 
-            u.last_name LIKE '%$search%' OR 
             combined.action_type LIKE '%$search%' OR 
-            combined.source LIKE '%$search%' OR 
-            combined.remarks LIKE '%$search%'";
+            combined.source LIKE '%$search%'";
     }
 
-    // --- CALCULATE TOTAL ROWS (Filtered by search) ---
+    // --- CALCULATE TOTALS ---
     $count_query = "SELECT COUNT(*) AS total FROM ($master_sql) AS combined 
                     LEFT JOIN products p ON combined.product_id = p.product_id
-                    LEFT JOIN users u ON combined.user_id = u.user_id 
-                    $search_where";
+                    LEFT JOIN users u ON combined.user_id = u.user_id $search_where";
     $count_result = $conn->query($count_query);
-    $total_rows = $count_result->fetch_assoc()['total'];
+    $total_rows = $count_result ? $count_result->fetch_assoc()['total'] : 0;
     $total_pages = ceil($total_rows / $limit);
 
-    // --- FETCH PAGINATED & FILTERED DATA ---
+    // --- FETCH DATA ---
     $sql_activity_log = "
         SELECT combined.*, p.product_name, p.sku, u.first_name, u.last_name
         FROM ($master_sql) AS combined
@@ -55,18 +52,5 @@
         $search_where
         ORDER BY full_datetime DESC 
         LIMIT $limit OFFSET $offset";
-
     $result_activity_log = $conn->query($sql_activity_log);
-
-    function time_ago($timestamp) {
-        $time_difference = time() - strtotime($timestamp);
-        if ($time_difference < 1) return "1 sec ago";
-        $periods = ["sec", "min", "hr", "day", "wk", "mo", "yr"];
-        $lengths = [60, 60, 24, 7, 4.35, 12, 1000];
-        for ($i = 0; $time_difference >= $lengths[$i] && $i < count($lengths) - 1; $i++) {
-            $time_difference /= $lengths[$i];
-        }
-        $time_difference = round($time_difference);
-        return "$time_difference " . $periods[$i] . ($time_difference != 1 ? "s" : "") . " ago";
-    }
 ?>

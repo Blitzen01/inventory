@@ -271,12 +271,16 @@
                 </div>
             </div>
 
-            <nav class="mt-4">
-                <ul class="pagination justify-content-center">
+            <nav class="card-footer bg-white d-flex justify-content-between align-items-center py-3 px-2 border-top">
+                <div class="text-muted small">
+                    Showing <b><?= count($users) ?></b> of <?= $total_users ?> items
+                </div>
+                
+                <ul class="pagination pagination-sm mb-0">
                     <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
                         <a class="page-link shadow-sm" href="?page=<?= $page - 1 ?>&limit=<?= $limit ?>">Previous</a>
                     </li>
-                    <li class="page-item active"><a class="page-link shadow-sm" href="#"><?= $page ?></a></li>
+                    <li class="page-item active"><a class="page-link bg-dark border-dark shadow-sm" href="#"><?= $page ?></a></li>
                     <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
                         <a class="page-link shadow-sm" href="?page=<?= $page + 1 ?>&limit=<?= $limit ?>">Next</a>
                     </li>
